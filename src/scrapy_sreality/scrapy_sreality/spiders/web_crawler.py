@@ -14,15 +14,6 @@ from src.database_model import Item, BASE
 LOGGER = logging.getLogger(__name__)
 
 
-def init_browser():
-    """ initialize Chrome headless browser instance """
-    chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')
-    chrome_options.add_argument('--headless')
-    return webdriver.Chrome('/chromedriver', chrome_options=chrome_options)
-
-
 class ScrapyHandler:
     """ handler class collecting output of scraping and implementing methods for persisting output into database """
     _page_content: List[Dict[str, List[Item]]] = []
@@ -31,9 +22,6 @@ class ScrapyHandler:
     engine = sqlalchemy.create_engine(CONN_STRING)
     BASE.metadata.create_all(engine)  # database init
     session = sessionmaker(bind=engine)()  # create session
-
-    # browser
-    browser = init_browser()
 
     @classmethod
     def push_to_database(cls):
@@ -49,15 +37,10 @@ class ScrapyHandler:
             cls.session.commit()
         cls.session.close()
         cls.engine.dispose()
-        cls.close_browser()
 
     @classmethod
     def add_content(cls, item_dict: Dict[str, List[Item]]):
         cls._page_content.append(item_dict)
-
-    @classmethod
-    def close_browser(cls):
-        cls.browser.close()
 
 
 class SRealitySpider(scrapy.Spider):
@@ -69,18 +52,24 @@ class SRealitySpider(scrapy.Spider):
     allowed_domains = ['sreality.cz']
 
     def start_requests(self):
-        """ Each page contains 20 records, we crawl first 30 pages in order to get first 500 records and something more
-         (sometimes pages response is empty, this could be done more thorough,
-          nevertheless this is the fastest way)"""
-        for page in range(1, 31):
+        """ Each page contains 20 records, we crawl first 25 pages in order to get first 500 records
+         (this could be done more thorough, nevertheless this is the fastest way)"""
+        for page in range(1, 26):
             yield scrapy.Request(f'https://www.sreality.cz/hledani/prodej/byty?strana={page}')
 
     def parse(self, response):
+        chrome_options = webdriver.ChromeOptions()
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--headless')
+
+        browser = webdriver.Chrome('/chromedriver', chrome_options=chrome_options)
+
         url = response.request.url
         current_page = int(url.split('=')[-1])
-        ScrapyHandler.browser.get(url)
+        browser.get(url)
 
-        innerHTML = ScrapyHandler.browser.execute_script("return document.body.innerHTML")
+        innerHTML = browser.execute_script("return document.body.innerHTML")
         soup = BeautifulSoup(innerHTML, 'html.parser')
         titles = [elem.text.replace('\xa0', ' ') for elem in soup.find_all(class_="name ng-binding")]
         image_urls = [image.select('preact img')[0]['src'] for image
@@ -88,6 +77,7 @@ class SRealitySpider(scrapy.Spider):
 
         ScrapyHandler.add_content(self.generate_items(current_page, titles=titles, image_urls=image_urls))
         yield {'page': current_page, 'titles': titles, 'image_urls': image_urls}
+        browser.close()
 
     @staticmethod
     def generate_items(page, titles, image_urls) -> Dict[str, List[Item]]:
