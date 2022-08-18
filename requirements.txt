@@ -1,0 +1,6 @@
+scrapy
+sqlalchemy
+flask
+selenium
+beautifulsoup4
+psycopg2

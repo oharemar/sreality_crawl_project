@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sreality scraped flat ads - first 500 items</title>
+</head>
+<body>
+<ol>
+ {% for text, image_url in content %}
+    <li>
+        <p>{{ text }}</p>
+         <img src="{{ image_url }}" alt="image">
+    </li>
+  {% endfor %}
+</ol>
+</body>
+</html>
