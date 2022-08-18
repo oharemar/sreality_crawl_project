@@ -6,3 +6,5 @@ This project scrapes sreality.cz flat/sell ads, retrieves first 500 items, store
 Prerequisities: installed docker and docker-compose on your machine
 
 Clone the repository and run _docker-compose up_  from within repository root.
+
+First build could take some time due to docker image building from scratch.
